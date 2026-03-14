@@ -1,8 +1,155 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Grafici studio</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 32px;
+      background: #f6f8fa;
+      color: #24292f;
+    }
+    h1 {
+      margin-bottom: 8px;
+    }
+    p {
+      color: #57606a;
+    }
+    .card {
+      background: white;
+      border: 1px solid #d0d7de;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 16px 0;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    ul {
+      margin: 8px 0 0 18px;
+    }
+    li {
+      margin: 6px 0;
+    }
+    a {
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .muted {
+      color: #57606a;
+      font-size: 0.95rem;
+    }
+    .error {
+      color: #b42318;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-  <h1>Grafici dello studio</h1>
+  <h1>Grafici interattivi dello studio</h1>
+  <p>Elenco generato automaticamente dalla cartella <code>grafici/</code> del repository.</p>
+
+  <div id="content" class="muted">Caricamento in corso...</div>
+
+  <script>
+    const owner = "drnicolamongiovi";
+    const repo = "dVol";
+    const branch = "main";
+    const basePath = "grafici";
+
+    const apiBase = `https://api.github.com/repos/${owner}/${repo}/contents`;
+    const pagesBase = `https://${owner}.github.io/${repo}`;
+
+    async function fetchDir(path) {
+      const url = `${apiBase}/${encodeURIComponent(path).replace(/%2F/g, "/")}?ref=${branch}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Errore API GitHub (${response.status}) per ${path}`);
+      }
+      return response.json();
+    }
+
+    async function listPatientFolders() {
+      const items = await fetchDir(basePath);
+      return items
+        .filter(item => item.type === "dir")
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    }
+
+    async function listHtmlFiles(folderPath) {
+      const items = await fetchDir(folderPath);
+      return items
+        .filter(item => item.type === "file" && item.name.toLowerCase().endsWith(".html"))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    }
+
+    function niceLabel(filename) {
+      return filename
+        .replace(/\.html$/i, "")
+        .replace(/[_-]+/g, " ");
+    }
+
+    async function render() {
+      const container = document.getElementById("content");
+
+      try {
+        const folders = await listPatientFolders();
+
+        if (folders.length === 0) {
+          container.innerHTML = '<div class="card">Nessuna sottocartella trovata in <code>grafici/</code>.</div>';
+          return;
+        }
+
+        container.innerHTML = "";
+
+        for (const folder of folders) {
+          const files = await listHtmlFiles(folder.path);
+
+          const card = document.createElement("div");
+          card.className = "card";
+
+          const title = document.createElement("h2");
+          title.textContent = folder.name;
+          card.appendChild(title);
+
+          if (files.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "muted";
+            empty.textContent = "Nessun file HTML in questa cartella.";
+            card.appendChild(empty);
+          } else {
+            const ul = document.createElement("ul");
+
+            for (const file of files) {
+              const li = document.createElement("li");
+              const a = document.createElement("a");
+
+              a.href = `${pagesBase}/${file.path}`;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              a.textContent = niceLabel(file.name);
+
+              li.appendChild(a);
+              ul.appendChild(li);
+            }
+
+            card.appendChild(ul);
+          }
+
+          container.appendChild(card);
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="error">Impossibile generare l'elenco automatico.</div>
+          <div class="muted">${err.message}</div>`;
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>
